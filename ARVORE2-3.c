@@ -6,8 +6,7 @@
 typedef struct No {
     int chaves[MAX];
     struct No *filhos[MAX + 1];
-    int qtd;
-    int folha;
+    int qtd, folha;
 } No;
 
 No *criarNo(int folha) {
@@ -27,26 +26,30 @@ void ordem(No *r) {
     ordem(r->filhos[r->qtd]);
 }
 
-void nivel(No *r) {
-    if (!r) return;
-    No *fila[100];
-    int ini = 0, fim = 0;
-    fila[fim++] = r;
-    while (ini < fim) {
-        No *atual = fila[ini++];
-        for (int i = 0; i < atual->qtd; i++)
-            printf("%d ", atual->chaves[i]);
-        for (int i = 0; i <= atual->qtd; i++)
-            if (atual->filhos[i]) fila[fim++] = atual->filhos[i];
-    }
-}
+No *inserir(No *raiz, int chave);
 
-int busca(No *r, int chave) {
-    if (!r) return 0;
-    int i = 0;
-    while (i < r->qtd && chave > r->chaves[i]) i++;
-    if (i < r->qtd && r->chaves[i] == chave) return 1;
-    return busca(r->filhos[i], chave);
+int main() {
+    No *raiz = NULL;
+    int opcao, valor;
+    while (1) {
+        printf("1. Inserir\n2. Exibir Ordem\n3. Sair\nEscolha: ");
+        scanf("%d", &opcao);
+        switch (opcao) {
+            case 1:
+                printf("Valor: ");
+                scanf("%d", &valor);
+                raiz = inserir(raiz, valor);
+                break;
+            case 2:
+                ordem(raiz);
+                printf("\n");
+                break;
+            case 3:
+                return 0;
+            default:
+                printf("Opcao invalida!\n");
+        }
+    }
 }
 
 void inserirEmNo(No *no, int chave, No *filhoDir) {
@@ -70,8 +73,7 @@ No *dividir(No *no, int *meio) {
     if (!no->folha) {
         novo->filhos[0] = no->filhos[2];
         novo->filhos[1] = no->filhos[3];
-        no->filhos[2] = NULL;
-        no->filhos[3] = NULL;
+        no->filhos[2] = no->filhos[3] = NULL;
     }
     return novo;
 }
@@ -102,16 +104,4 @@ No *inserir(No *raiz, int chave) {
     novaRaiz->filhos[1] = novo;
     novaRaiz->qtd = 1;
     return novaRaiz;
-}
-
-int main() {
-    No *raiz = NULL;
-    int valores[] = {10, 20, 30, 40, 50};
-    for (int i = 0; i < 5; i++) raiz = inserir(raiz, valores[i]);
-    printf("Ordem: ");
-    ordem(raiz);
-    printf("\nNivel: ");
-    nivel(raiz);
-    printf("\n");
-    return 0;
 }
