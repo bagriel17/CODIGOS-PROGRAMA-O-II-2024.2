@@ -46,18 +46,6 @@ void inserirEmNo(No* no, int chave, No* filhoDir) {
     no->qtd++;
 }
 
-void inserirEmNo(No* no, int chave, No* filhoDir) {
-    int i = no->qtd - 1;
-    while (i >= 0 && chave < no->chaves[i]) {
-        no->chaves[i + 1] = no->chaves[i];
-        no->filhos[i + 2] = no->filhos[i + 1];
-        i--;
-    }
-    no->chaves[i + 1] = chave;
-    no->filhos[i + 2] = filhoDir;
-    no->qtd++;
-}
-
 No* dividirNo(No* no, int* chavePromovida) {
     No* novoNo = criarNo(no->folha);
     *chavePromovida = no->chaves[1]; // A chave do meio é promovida
@@ -131,6 +119,5 @@ int main() {
                 printf("Opcao invalida!\n");
         }
     }
-
     return 0;
 }
