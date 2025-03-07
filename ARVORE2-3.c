@@ -1,32 +1,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAX 2
+#define MAX_CHAVES 2
+#define MAX_FILHOS 3
 
 typedef struct No {
-    int chaves[MAX];
-    struct No *filhos[MAX + 1];
+    int chaves[MAX_CHAVES];
+    struct No* filhos[MAX_FILHOS];
     int qtd, folha;
 } No;
 
 No *criarNo(int folha) {
-    No *no = malloc(sizeof(No));
+    No* no = (No*)malloc(sizeof(No));
     no->qtd = 0;
     no->folha = folha;
-    for (int i = 0; i <= MAX; i++) no->filhos[i] = NULL;
+    for (int i = 0; i <= MAX_FILHOS; i++) {
+        no->filhos[i] = NULL;
+    }
     return no;
 }
 
-void ordem(No *r) {
-    if (!r) return;
-    for (int i = 0; i < r->qtd; i++) {
-        ordem(r->filhos[i]);
-        printf("%d ", r->chaves[i]);
+void percursoEmOrdem(No* no) {
+    if (no != NULL) {
+        for (int i = 0; i < no->qtd; i++) {
+            if (!no->folha) {
+                percursoEmOrdem(no->filhos[i]);
+            }
+            printf("%d ", no->chaves[i]);
+        }
+        if (!no->folha) {
+            percursoEmOrdem(no->filhos[no->qtd]);
+        }
     }
-    ordem(r->filhos[r->qtd]);
 }
 
-No *inserir(No *raiz, int chave);
+void inserirEmNo(No* no, int chave, No* filhoDir) {
+    int i = no->qtd - 1;
+    while (i >= 0 && chave < no->chaves[i]) {
+        no->chaves[i + 1] = no->chaves[i];
+        no->filhos[i + 2] = no->filhos[i + 1];
+        i--;
+    }
+    no->chaves[i + 1] = chave;
+    no->filhos[i + 2] = filhoDir;
+    no->qtd++;
+}
 
 int main() {
     No *raiz = NULL;
@@ -50,18 +68,6 @@ int main() {
                 printf("Opcao invalida!\n");
         }
     }
-}
-
-void inserirEmNo(No *no, int chave, No *filhoDir) {
-    int i = no->qtd - 1;
-    while (i >= 0 && chave < no->chaves[i]) {
-        no->chaves[i + 1] = no->chaves[i];
-        no->filhos[i + 2] = no->filhos[i + 1];
-        i--;
-    }
-    no->chaves[i + 1] = chave;
-    no->filhos[i + 2] = filhoDir;
-    no->qtd++;
 }
 
 No *dividir(No *no, int *meio) {
