@@ -1,35 +1,37 @@
-// Searching on a B+ Tree in C
+//ARVORE B+
+//GRUPO: MIGUEL PERES; GABRIEL MELO; PAULO ANDRE
 
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Default order
+//Numero maximo de chaves -> order -1 | Numero maximo dos ponteiros por nó 
 #define ORDER 3
 
+//Valores das folhas
 typedef struct record {
     int value;
 } record;
 
-// Node
+//struct para Nós
 typedef struct node {
-    void **pointers;
-    int *keys;
-    struct node *parent;
-    bool is_leaf;
-    int num_keys;
-    struct node *next;
+    void **pointers;      //ponteiros para as folhas ou nós filhos
+    int *keys;            //chaves dos nós
+    struct node *parent;  //ponteiro para o nó pai | para o split
+    bool is_leaf;         //se o nó é folha ou interno, àqueles que possuem apenas os índices/chaves
+    int num_keys;         //conta o número de chaves por no
+    struct node *next;    //encadeia as folhas em lista
 } node;
 
-int order = ORDER;
-node *queue = NULL;
-bool verbose_output = false;
+int order = ORDER;           //quantidade maxima de ponteiros por nó e de chaves 
+node *queue = NULL;          //a fila encadeada da arvore
+bool verbose_output = false; //mostra apenas o conteudo necessário da arvore
 
-// Enqueue
+//Enqueue
 void enqueue(node *new_node);
 
-// Dequeue
+//Dequeue
 node *dequeue(void);
 int height(node *const root);
 int pathToLeaves(node *const root, node *child);
@@ -55,23 +57,26 @@ node *insertIntoNewRoot(node *left, int key, node *right);
 node *startNewTree(int key, record *pointer);
 node *insert(node *root, int key, int value);
 
-// Enqueue
+//adições de nos no final da fila
 void enqueue(node *new_node) {
-    node *c;
+    node *c;                     //ponteiro auxiliar
+    //se não haver nenhum elemento na fila
     if (queue == NULL) {
         queue = new_node;
-        queue->next = NULL;
+        queue->next = NULL;      //vai apontar para NULL
     } else {
         c = queue;
+        //percorre a fila até chegar no ultimo elemento
         while (c->next != NULL) {
-        c = c->next;
+            c = c->next;
         }
+        //insere no ultimo elemento
         c->next = new_node;
         new_node->next = NULL;
     }
 }
 
-// Dequeue
+//remoção de nós do inicio da fila
 node *dequeue(void) {
     node *n = queue;
     queue = queue->next;
@@ -79,7 +84,7 @@ node *dequeue(void) {
     return n;
 }
 
-// Print the leaves
+//Imprime as folhas da arvore
 void printLeaves(node *const root) {
     if (root == NULL) {
         printf("Empty tree.\n");
@@ -87,48 +92,52 @@ void printLeaves(node *const root) {
     }
     int i;
     node *c = root;
+    //até chegar no primeiro elemento da fila
     while (!c->is_leaf)
         c = c->pointers[0];
     while (true) {
+        //imprimir nós folhas
         for (i = 0; i < c->num_keys; i++) {
-        if (verbose_output)
-            printf("%p ", c->pointers[i]);
-        printf("%d ", c->keys[i]);
+            if (verbose_output)
+                printf("%p ", c->pointers[i]);
+            printf("%d ", c->keys[i]);
         }
         if (verbose_output)
-        printf("%p ", c->pointers[order - 1]);
+            printf("%p ", c->pointers[order - 1]);
+        
+        //ir para a próxima folha, se tiver
         if (c->pointers[order - 1] != NULL) {
-        printf(" | ");
-        c = c->pointers[order - 1];
-        } else
-        break;
+            printf(" | ");
+            c = c->pointers[order - 1];
+        }else
+            break;
     }
     printf("\n");
 }
 
-// Calculate height
+//altura | número de níveis da arvore
 int height(node *const root) {
-    int h = 0;
-    node *c = root;
+    int h = 0;              //contador 
+    node *c = root;         //raiz
     while (!c->is_leaf) {
         c = c->pointers[0];
-        h++;
+        h++;                //acrecenta a h até chegar a um nó folha
     }
     return h;
 }
 
-// Get path to root
+//quantidades de saltos que um nó filho dá até chegar na raiz
 int pathToLeaves(node *const root, node *child) {
-    int length = 0;
-    node *c = child;
+    int length = 0;     //contador
+    node *c = child;    //filho
     while (c != root) {
-        c = c->parent;
-        length++;
+        c = c->parent;  
+        length++;       //acrescenta até chegar na raiz
     }
     return length;
 }
 
-// Print the tree
+//imprime a arvore completa
 void printTree(node *const root) {
     node *n = NULL;
     int i = 0;
@@ -171,7 +180,7 @@ void printTree(node *const root) {
     printf("\n");
 }
 
-// Find the node and print it
+//Imprime o valor buscado
 void findAndPrint(node *const root, int key, bool verbose) {
     node *leaf = NULL;
     record *r = find(root, key, verbose, NULL);
@@ -181,7 +190,7 @@ void findAndPrint(node *const root, int key, bool verbose) {
         printf("Record at %p -- key %d, value %d.\n", r, key, r->value);
 }
 
-// Find and print the range
+//Imprime valores de findRange
 void findAndPrintRange(node *const root, int key_start, int key_end, bool verbose) {
     int i;
     int array_size = key_end - key_start + 1;
@@ -202,7 +211,7 @@ void findAndPrintRange(node *const root, int key_start, int key_end, bool verbos
     }
 }
 
-// Find the range
+//busca valor
 int findRange(node *const root, int key_start, int key_end, bool verbose, int returned_keys[], void *returned_pointers[]) {
     int i, num_found;
     num_found = 0;
@@ -225,7 +234,7 @@ int findRange(node *const root, int key_start, int key_end, bool verbose, int re
     return num_found;
 }
 
-// Find the leaf
+// Busca valor em uma folha
 node *findLeaf(node *const root, int key, bool verbose) {
     if (root == NULL) {
         if (verbose)
@@ -234,6 +243,7 @@ node *findLeaf(node *const root, int key, bool verbose) {
     }
     int i = 0;
     node *c = root;
+    //até chegar a uma folha
     while (!c->is_leaf) {
         if (verbose) {
         printf("[");
@@ -261,6 +271,7 @@ node *findLeaf(node *const root, int key, bool verbose) {
     return c;
 }
 
+//busca de valor para findAndPrint
 record *find(node *root, int key, bool verbose, node **leaf_out) {
     if (root == NULL) {
         if (leaf_out != NULL) {
@@ -286,6 +297,7 @@ record *find(node *root, int key, bool verbose, node **leaf_out) {
         return (record *)leaf->pointers[i];
 }
 
+//determina a divisão das chaves para o split
 int cut(int length) {
     if (length % 2 == 0)
         return length / 2;
@@ -293,6 +305,7 @@ int cut(int length) {
         return length / 2 + 1;
 }
 
+//cria/aloca um novo espaço para dados
 record *makeRecord(int value) {
     record *new_record = (record *)malloc(sizeof(record));
     if (new_record == NULL) {
@@ -304,6 +317,7 @@ record *makeRecord(int value) {
     return new_record;
 }
 
+//cria um novo nó interno
 node *makeNode(void) {
     node *new_node;
     new_node = malloc(sizeof(node));
@@ -328,12 +342,14 @@ node *makeNode(void) {
     return new_node;
 }
 
+//cria um nó folha 
 node *makeLeaf(void) {
     node *leaf = makeNode();
     leaf->is_leaf = true;
     return leaf;
 }
 
+//auxilia a posição em que o novo nó vai ficar
 int getLeftIndex(node *parent, node *left) {
     int left_index = 0;
     while (left_index <= parent->num_keys &&
@@ -342,6 +358,7 @@ int getLeftIndex(node *parent, node *left) {
     return left_index;
 }
 
+//inserir quando a folha estiver vazia
 node *insertIntoLeaf(node *leaf, int key, record *pointer) {
     int i, insertion_point;
 
@@ -359,6 +376,7 @@ node *insertIntoLeaf(node *leaf, int key, record *pointer) {
     return leaf;
 }
 
+//inserir quando estiver cheia | faz o split
 node *insertIntoLeafAfterSplitting(node *root, node *leaf, int key, record *pointer) {
     node *new_leaf;
     int *temp_keys;
@@ -426,6 +444,7 @@ node *insertIntoLeafAfterSplitting(node *root, node *leaf, int key, record *poin
     return insertIntoParent(root, leaf, new_key, new_leaf);
 }
 
+//inserir em nó interno
 node *insertIntoNode(node *root, node *n, int left_index, int key, node *right) {
     int i;
 
@@ -439,6 +458,7 @@ node *insertIntoNode(node *root, node *n, int left_index, int key, node *right) 
     return root;
 }
 
+//split do nó interno
 node *insertIntoNodeAfterSplitting(node *root, node *old_node, int left_index, int key, node *right) {
     int i, j, split, k_prime;
     node *new_node, *child;
@@ -496,6 +516,7 @@ node *insertIntoNodeAfterSplitting(node *root, node *old_node, int left_index, i
     return insertIntoParent(root, old_node, k_prime, new_node);
 }
 
+//inserção no nó pai
 node *insertIntoParent(node *root, node *left, int key, node *right) {
     int left_index;
     node *parent;
@@ -513,6 +534,7 @@ node *insertIntoParent(node *root, node *left, int key, node *right) {
     return insertIntoNodeAfterSplitting(root, parent, left_index, key, right);
 }
 
+//insere nova raiz após splits que mudam a altura da arvore
 node *insertIntoNewRoot(node *left, int key, node *right) {
     node *root = makeNode();
     root->keys[0] = key;
@@ -525,6 +547,7 @@ node *insertIntoNewRoot(node *left, int key, node *right) {
     return root;
 }
 
+//cria o primeiro nó
 node *startNewTree(int key, record *pointer) {
     node *root = makeLeaf();
     root->keys[0] = key;
@@ -535,23 +558,28 @@ node *startNewTree(int key, record *pointer) {
     return root;
 }
 
+//inserção geral
 node *insert(node *root, int key, int value) {
     record *record_pointer = NULL;
     node *leaf = NULL;
 
+    //verificando se o valor é repetido
     record_pointer = find(root, key, false, NULL);
     if (record_pointer != NULL) {
-        record_pointer->value = value;
+        record_pointer->value = value;             //atualiza o valor da chave se o valor for repetido
         return root;
     }
 
+    //criando/alocando um novo espaço
     record_pointer = makeRecord(value);
 
+    //arvore vazia
     if (root == NULL)
         return startNewTree(key, record_pointer);
 
     leaf = findLeaf(root, key, false);
 
+    //inserção padrão ou com split
     if (leaf->num_keys < order - 1) {
         leaf = insertIntoLeaf(leaf, key, record_pointer);
         return root;
@@ -566,6 +594,7 @@ int main() {
 
     root = NULL;
 
+    //inserção de dados
     root = insert(root, 5, 33);
     root = insert(root, 15, 21);
     root = insert(root, 25, 31);
@@ -574,6 +603,7 @@ int main() {
 
     printTree(root);
 
+    //busca a chave do elemento 15
     findAndPrint(root, 15, instruction = 'a');
 
     return 0;
