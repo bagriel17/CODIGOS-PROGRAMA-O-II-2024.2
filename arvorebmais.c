@@ -2,7 +2,8 @@
 //GRUPO: MIGUEL PERES; GABRIEL MELO; PAULO ANDRE
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h> // para variáveis boleanas | bool
+#include <stdbool.h>
+#include <ctype.h> // para toupper()
 
 // para auxiliar nos splits:
 #define MAX_CHAVES 3               
@@ -38,6 +39,7 @@ typedef struct {
     QueueNo *fim;
 } Queue;
 
+// Protótipos de funções
 No *CriarNo(bool e_folha);
 void Inserir(int chave);
 void Inserir_na_Folha(No *folha, int chave);
@@ -50,6 +52,15 @@ void SplitInterno(No *no);
 No *LocalizaFolha(No *no, int chave);
 void BuscaChave(int chave);
 void ImprimirBFS(No *raiz);
+int EncontrarPosicaoChave(No *no, int chave);
+int EncontrarPredecessor(No *no, int pos);
+int EncontrarSucessor(No *no, int pos);
+void Remover(int chave);
+void RemoverDaFolha(No *folha, int chave);
+void EmprestarOuMesclar(No *no);
+void MesclarFolhas(No *folha, No *vizinho, int chavePai);
+void MesclarInternos(No *no, No *vizinho, int chavePai);
+void menu();
 
 // função para criação de nós:
 No *CriarNo(bool e_folha) {
@@ -228,6 +239,385 @@ void BuscaChave(int chave) {
     printf("Chave %d não encontrada.\n", chave);
 }
 
+// procedimento para remover uma chave da folha
+void RemoverDaFolha(No *folha, int chave) {
+    int i = 0;
+    while (i < folha->num_chaves && folha->chaves[i] != chave) {
+        i++;
+    }
+    
+    if (i == folha->num_chaves) {
+        printf("Chave %d não encontrada na folha.\n", chave);
+        return;
+    }
+    
+    // Deslocar as chaves para preencher o espaço
+    for (int j = i; j < folha->num_chaves - 1; j++) {
+        folha->chaves[j] = folha->chaves[j + 1];
+    }
+    
+    folha->num_chaves--;
+}
+
+// Função para mesclar folhas
+void MesclarFolhas(No *folha, No *vizinho, int chavePai) {
+    // Copiar chaves do vizinho para a folha
+    for (int i = 0; i < vizinho->num_chaves; i++) {
+        folha->chaves[folha->num_chaves + i] = vizinho->chaves[i];
+    }
+    
+    folha->num_chaves += vizinho->num_chaves;
+    folha->prox = vizinho->prox;
+    
+    // Remover a chave do pai e o ponteiro para o vizinho
+    No *pai = folha->pai;
+    int pos = 0;
+    while (pos < pai->num_chaves && pai->chaves[pos] < chavePai) {
+        pos++;
+    }
+    
+    // Deslocar chaves e ponteiros no pai
+    for (int i = pos; i < pai->num_chaves - 1; i++) {
+        pai->chaves[i] = pai->chaves[i + 1];
+    }
+    for (int i = pos + 1; i < pai->num_chaves; i++) {
+        pai->filho[i] = pai->filho[i + 1];
+    }
+    
+    pai->num_chaves--;
+    
+    free(vizinho);
+}
+
+// Função para mesclar nós internos
+void MesclarInternos(No *no, No *vizinho, int chavePai) {
+    // Adicionar a chave do pai ao nó
+    no->chaves[no->num_chaves] = chavePai;
+    no->num_chaves++;
+    
+    // Copiar chaves e ponteiros do vizinho
+    for (int i = 0; i < vizinho->num_chaves; i++) {
+        no->chaves[no->num_chaves + i] = vizinho->chaves[i];
+    }
+    for (int i = 0; i <= vizinho->num_chaves; i++) {
+        no->filho[no->num_chaves + i] = vizinho->filho[i];
+        vizinho->filho[i]->pai = no;
+    }
+    
+    no->num_chaves += vizinho->num_chaves;
+    
+    // Remover a chave do pai e o ponteiro para o vizinho
+    No *pai = no->pai;
+    int pos = 0;
+    while (pos < pai->num_chaves && pai->chaves[pos] < chavePai) {
+        pos++;
+    }
+    
+    // Deslocar chaves e ponteiros no pai
+    for (int i = pos; i < pai->num_chaves - 1; i++) {
+        pai->chaves[i] = pai->chaves[i + 1];
+    }
+    for (int i = pos + 1; i < pai->num_chaves; i++) {
+        pai->filho[i] = pai->filho[i + 1];
+    }
+    
+    pai->num_chaves--;
+    
+    free(vizinho);
+}
+
+// Função para emprestar chave de um vizinho ou mesclar
+void EmprestarOuMesclar(No *no) {
+    if (no == raiz) {
+        if (no->num_chaves == 0) {
+            if (no->e_folha) {
+                free(no);
+                raiz = NULL;
+            } else {
+                raiz = no->filho[0];
+                raiz->pai = NULL;
+                free(no);
+            }
+        }
+        return;
+    }
+    
+    No *pai = no->pai;
+    int pos = 0;
+    while (pos <= pai->num_chaves && pai->filho[pos] != no) {
+        pos++;
+    }
+    
+    // Tentar emprestar do irmão esquerdo
+    if (pos > 0) {
+        No *vizinhoEsq = pai->filho[pos - 1];
+        if (vizinhoEsq->num_chaves > MIN_CHAVES) {
+            // Emprestar do vizinho esquerdo
+            if (no->e_folha) {
+                // Mover a última chave do vizinho para o nó
+                for (int i = no->num_chaves; i > 0; i--) {
+                    no->chaves[i] = no->chaves[i - 1];
+                }
+                no->chaves[0] = vizinhoEsq->chaves[vizinhoEsq->num_chaves - 1];
+                no->num_chaves++;
+                vizinhoEsq->num_chaves--;
+                
+                // Atualizar a chave do pai
+                pai->chaves[pos - 1] = no->chaves[0];
+            } else {
+                // Mover a chave do pai para o nó
+                no->filho[no->num_chaves + 1] = no->filho[no->num_chaves];
+                for (int i = no->num_chaves; i > 0; i--) {
+                    no->chaves[i] = no->chaves[i - 1];
+                    no->filho[i] = no->filho[i - 1];
+                }
+                no->chaves[0] = pai->chaves[pos - 1];
+                no->filho[0] = vizinhoEsq->filho[vizinhoEsq->num_chaves];
+                no->filho[0]->pai = no;
+                no->num_chaves++;
+                
+                // Mover a última chave do vizinho para o pai
+                pai->chaves[pos - 1] = vizinhoEsq->chaves[vizinhoEsq->num_chaves - 1];
+                
+                vizinhoEsq->num_chaves--;
+            }
+            return;
+        }
+    }
+    
+    // Tentar emprestar do irmão direito
+    if (pos < pai->num_chaves) {
+        No *vizinhoDir = pai->filho[pos + 1];
+        if (vizinhoDir->num_chaves > MIN_CHAVES) {
+            // Emprestar do vizinho direito
+            if (no->e_folha) {
+                // Mover a primeira chave do vizinho para o nó
+                no->chaves[no->num_chaves] = vizinhoDir->chaves[0];
+                no->num_chaves++;
+                
+                // Deslocar as chaves do vizinho
+                for (int i = 0; i < vizinhoDir->num_chaves - 1; i++) {
+                    vizinhoDir->chaves[i] = vizinhoDir->chaves[i + 1];
+                }
+                vizinhoDir->num_chaves--;
+                
+                // Atualizar a chave do pai
+                pai->chaves[pos] = vizinhoDir->chaves[0];
+            } else {
+                // Mover a chave do pai para o nó
+                no->chaves[no->num_chaves] = pai->chaves[pos];
+                no->filho[no->num_chaves + 1] = vizinhoDir->filho[0];
+                no->filho[no->num_chaves + 1]->pai = no;
+                no->num_chaves++;
+                
+                // Mover a primeira chave do vizinho para o pai
+                pai->chaves[pos] = vizinhoDir->chaves[0];
+                
+                // Deslocar chaves e ponteiros do vizinho
+                for (int i = 0; i < vizinhoDir->num_chaves - 1; i++) {
+                    vizinhoDir->chaves[i] = vizinhoDir->chaves[i + 1];
+                }
+                for (int i = 0; i < vizinhoDir->num_chaves; i++) {
+                    vizinhoDir->filho[i] = vizinhoDir->filho[i + 1];
+                }
+                vizinhoDir->num_chaves--;
+            }
+            return;
+        }
+    }
+    
+    // Se não puder emprestar, mesclar
+    if (pos > 0) {
+        // Mesclar com o vizinho esquerdo
+        No *vizinhoEsq = pai->filho[pos - 1];
+        if (no->e_folha) {
+            MesclarFolhas(vizinhoEsq, no, pai->chaves[pos - 1]);
+        } else {
+            MesclarInternos(vizinhoEsq, no, pai->chaves[pos - 1]);
+        }
+        no = vizinhoEsq;
+    } else {
+        // Mesclar com o vizinho direito
+        No *vizinhoDir = pai->filho[pos + 1];
+        if (no->e_folha) {
+            MesclarFolhas(no, vizinhoDir, pai->chaves[pos]);
+        } else {
+            MesclarInternos(no, vizinhoDir, pai->chaves[pos]);
+        }
+    }
+    
+    // Verificar se o pai ficou com poucas chaves
+    if (pai->num_chaves < MIN_CHAVES) {
+        EmprestarOuMesclar(pai);
+    }
+}
+
+// Adicionando esta função auxiliar para encontrar a chave no nó interno
+int EncontrarPosicaoChave(No *no, int chave) {
+  int pos = 0;
+  while (pos < no->num_chaves && chave > no->chaves[pos]) {
+      pos++;
+  }
+  return pos;
+}
+
+// Função para encontrar o predecessor de uma chave em um nó interno
+int EncontrarPredecessor(No *no, int pos) {
+  No *atual = no->filho[pos];
+  while (!atual->e_folha) {
+      atual = atual->filho[atual->num_chaves];
+  }
+  return atual->chaves[atual->num_chaves - 1];
+}
+
+// Função para encontrar o sucessor de uma chave em um nó interno
+int EncontrarSucessor(No *no, int pos) {
+  No *atual = no->filho[pos + 1];
+  while (!atual->e_folha) {
+      atual = atual->filho[0];
+  }
+  return atual->chaves[0];
+}
+
+// Função principal para remover uma chave
+void Remover(int chave) {
+  if (raiz == NULL) {
+      printf("Árvore vazia.\n");
+      return;
+  }
+
+  No *folha = LocalizaFolha(raiz, chave);
+  int pos_folha = -1;
+  
+  // Verificar se a chave existe na folha
+  for (int i = 0; i < folha->num_chaves; i++) {
+      if (folha->chaves[i] == chave) {
+          pos_folha = i;
+          break;
+      }
+  }
+
+  if (pos_folha == -1) {
+      printf("Chave %d não encontrada na árvore.\n", chave);
+      return;
+  }
+
+  // Remover da folha
+  RemoverDaFolha(folha, chave);
+
+  // Se a folha é a raiz, não precisa fazer mais nada
+  if (folha == raiz) {
+      if (folha->num_chaves == 0) {
+          free(folha);
+          raiz = NULL;
+      }
+      return;
+  }
+
+  // Se a folha ficou com poucas chaves, tratar underflow
+  if (folha->num_chaves < MIN_CHAVES) {
+      EmprestarOuMesclar(folha);
+  }
+
+  // Agora precisamos remover a chave dos nós internos se necessário
+  No *no = folha;
+  while (no->pai != NULL) {
+      No *pai = no->pai;
+      int pos_pai = 0;
+      
+      // Encontrar a posição do filho no pai
+      while (pos_pai <= pai->num_chaves && pai->filho[pos_pai] != no) {
+          pos_pai++;
+      }
+
+      // Se a chave removida era a primeira da folha, precisamos atualizar os nós internos
+      if (pos_folha == 0 && pos_pai > 0) {
+          // A chave no pai que aponta para esta folha pode precisar ser atualizada
+          if (no->num_chaves > 0) {
+              pai->chaves[pos_pai - 1] = no->chaves[0];
+          } else if (no->prox != NULL) {
+              pai->chaves[pos_pai - 1] = no->prox->chaves[0];
+          }
+      }
+
+      no = pai;
+  }
+
+  printf("Chave %d removida com sucesso.\n", chave);
+}
+
+// Função para remover uma chave de um nó interno
+void RemoverDoInterno(No *no, int chave) {
+  int pos = EncontrarPosicaoChave(no, chave);
+  
+  if (pos < no->num_chaves && no->chaves[pos] == chave) {
+      // Caso 1: A chave está neste nó interno
+      if (no->filho[pos]->num_chaves > MIN_CHAVES) {
+          // Substituir pelo predecessor
+          int pred = EncontrarPredecessor(no, pos);
+          no->chaves[pos] = pred;
+          // Remover o predecessor da folha
+          No *folha = LocalizaFolha(no->filho[pos], pred);
+          RemoverDaFolha(folha, pred);
+          if (folha->num_chaves < MIN_CHAVES) {
+              EmprestarOuMesclar(folha);
+          }
+      } else if (no->filho[pos + 1]->num_chaves > MIN_CHAVES) {
+          // Substituir pelo sucessor
+          int succ = EncontrarSucessor(no, pos);
+          no->chaves[pos] = succ;
+          // Remover o sucessor da folha
+          No *folha = LocalizaFolha(no->filho[pos + 1], succ);
+          RemoverDaFolha(folha, succ);
+          if (folha->num_chaves < MIN_CHAVES) {
+              EmprestarOuMesclar(folha);
+          }
+      } else {
+          // Mesclar os filhos e remover a chave
+          No *esq = no->filho[pos];
+          No *dir = no->filho[pos + 1];
+          
+          if (esq->e_folha) {
+              MesclarFolhas(esq, dir, chave);
+          } else {
+              MesclarInternos(esq, dir, chave);
+          }
+          
+          // Remover a chave e o ponteiro do nó
+          for (int i = pos; i < no->num_chaves - 1; i++) {
+              no->chaves[i] = no->chaves[i + 1];
+          }
+          for (int i = pos + 1; i < no->num_chaves; i++) {
+              no->filho[i] = no->filho[i + 1];
+          }
+          no->num_chaves--;
+          
+          if (no->num_chaves < MIN_CHAVES) {
+              if (no == raiz) {
+                  if (no->num_chaves == 0) {
+                      raiz = no->filho[0];
+                      raiz->pai = NULL;
+                      free(no);
+                  }
+              } else {
+                  EmprestarOuMesclar(no);
+              }
+          }
+      }
+  } else {
+      // A chave não está neste nó, continuar descendo
+      No *filho = no->filho[pos];
+      if (filho->num_chaves == MIN_CHAVES) {
+          // Garantir que o filho tem chaves suficientes antes de descer
+          EmprestarOuMesclar(filho);
+          // Pode ter mudado a estrutura, precisamos reavaliar
+          RemoverDoInterno(no, chave);
+      } else {
+          RemoverDoInterno(filho, chave);
+      }
+  }
+}
+
 // procedimento para inserir no fim da fila das folhas:
 void Enqueue(Queue *q, No *no_arvore) {
     QueueNo *novoNo = (QueueNo *)malloc(sizeof(QueueNo));
@@ -309,27 +699,51 @@ void ImprimirBFS(No *raiz) {
     }
 }
 
+// Menu interativo
+void menu() {
+    char opcao;
+    int chave;
+    
+    do {
+        printf("\n--- Menu Árvore B+ ---\n");
+        printf("1. Inserir chave\n");
+        printf("2. Remover chave\n");
+        printf("3. Buscar chave\n");
+        printf("4. Imprimir árvore\n");
+        printf("5. Sair\n");
+        printf("Escolha uma opção: ");
+        scanf(" %c", &opcao);
+        
+        switch(opcao) {
+            case '1':
+                printf("Digite a chave a ser inserida: ");
+                scanf("%d", &chave);
+                Inserir(chave);
+                break;
+            case '2':
+                printf("Digite a chave a ser removida: ");
+                scanf("%d", &chave);
+                Remover(chave);
+                break;
+            case '3':
+                printf("Digite a chave a ser buscada: ");
+                scanf("%d", &chave);
+                BuscaChave(chave);
+                break;
+            case '4':
+                printf("\nEstrutura da Árvore B+ (BFS por níveis):\n");
+                ImprimirBFS(raiz);
+                break;
+            case '5':
+                printf("Saindo...\n");
+                break;
+            default:
+                printf("Opção inválida!\n");
+        }
+    } while (opcao != '5');
+}
+
 int main() {
-    // inserindo valores à arvore
-    Inserir(79);
-    Inserir(24);
-    Inserir(32);
-    Inserir(134);
-    Inserir(0);
-    Inserir(17);
-    Inserir(30);
-    Inserir(33);
-    Inserir(132);
-    Inserir(150);
-    
-    // exibindo:
-    printf("Estrutura da Árvore B+ (BFS por níveis):\n");
-    ImprimirBFS(raiz);
-    
-    // buscando chaves:
-    printf("\nBusca:\n");
-    BuscaChave(134);
-    BuscaChave(12);
-    
+    menu();
     return 0;
 }
